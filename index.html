@@ -293,6 +293,83 @@ select.fc{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
   <div class="content" id="det-body"></div>
 </div>
 
+<!-- EDIT ORDER -->
+<div class="screen" id="s-edit">
+  <div class="topbar">
+    <button class="back-btn" onclick="cancelEdit()"><i class="ti ti-arrow-left"></i></button>
+    <span class="topbar-title" id="edit-ref">Edit Order</span>
+    <span style="font-size:11px;color:rgba(255,255,255,.6);">PENDING</span>
+  </div>
+  <div class="content">
+    <!-- Customer (read-only in edit mode) -->
+    <div class="sec">Customer</div>
+    <div class="sel-cust" style="margin-bottom:14px;">
+      <div>
+        <div style="font-size:14px;font-weight:700;" id="edit-cust-name">—</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="edit-cust-sub">—</div>
+      </div>
+      <span class="badge b-pending">Pending</span>
+    </div>
+
+    <!-- Products -->
+    <div class="sec">Items</div>
+    <div id="edit-items"></div>
+    <button class="btn btn-ghost btn-block" style="margin-bottom:14px;" onclick="navTo('s-edit-prods')">
+      <i class="ti ti-plus"></i> Add / change products
+    </button>
+
+    <!-- Delivery -->
+    <div class="sec">Delivery</div>
+    <div class="tog-row">
+      <button class="tog-opt" id="ed-collect" onclick="setEditDel('collect')"><i class="ti ti-building-store"></i> Collect</button>
+      <button class="tog-opt" id="ed-deliver" onclick="setEditDel('deliver')"><i class="ti ti-truck"></i> Delivery</button>
+    </div>
+    <div id="edit-del-fields" style="display:none;">
+      <div class="fg"><label class="fl">Delivery address</label><textarea class="fc" id="edit-del-addr" rows="2"></textarea></div>
+      <div class="row2">
+        <div class="fg"><label class="fl">Delivery cost (₹)</label><input class="fc" id="edit-del-cost" type="number" min="0" oninput="renderEditTotals()"/></div>
+        <div class="fg"><label class="fl">Logistics partner</label><input class="fc" id="edit-del-partner" type="text"/></div>
+      </div>
+    </div>
+
+    <!-- Payment -->
+    <div class="sec">Payment type</div>
+    <div class="pay-row">
+      <button class="pay-opt" id="ep-cash"   onclick="setEditPay('cash')"><i class="ti ti-cash"></i> Cash</button>
+      <button class="pay-opt" id="ep-credit" onclick="setEditPay('credit')"><i class="ti ti-credit-card"></i> Credit</button>
+    </div>
+
+    <!-- Notes -->
+    <div class="fg"><label class="fl">Notes</label><textarea class="fc" id="edit-notes" rows="2"></textarea></div>
+
+    <!-- Totals -->
+    <div id="edit-totals"></div>
+
+    <button class="btn btn-primary btn-block" id="save-edit-btn" onclick="saveEdit()">
+      <i class="ti ti-device-floppy"></i> Save Changes
+    </button>
+    <div style="height:24px;"></div>
+  </div>
+</div>
+
+<!-- EDIT ORDER: PRODUCT PICKER -->
+<div class="screen" id="s-edit-prods">
+  <div class="topbar">
+    <button class="back-btn" onclick="navTo('s-edit')"><i class="ti ti-arrow-left"></i></button>
+    <span class="topbar-title">Change Products</span>
+  </div>
+  <div style="padding:10px 14px 0;flex-shrink:0;">
+    <div class="si"><i class="ti ti-search"></i><input class="fc" id="ep-search" type="search" placeholder="Search products…" oninput="renderEditProds()"/></div>
+  </div>
+  <div class="chips" id="ep-chips"></div>
+  <div class="content" id="ep-list"></div>
+  <div class="action-bar">
+    <button class="btn btn-primary btn-block" onclick="navTo('s-edit');renderEditItems();renderEditTotals();">
+      <span id="ep-done-lbl">Done</span> <i class="ti ti-check"></i>
+    </button>
+  </div>
+</div>
+
 </div>
 <div id="toast"></div>
 
@@ -328,6 +405,7 @@ var STAFF = { baburaj:'1111', selvin:'2222', warehouse:'3333' };
 var me='', products=[], cart={}, selCust=null;
 var delMode='collect', payMode='cash', activeCat='All', dashMode='my';
 var pinBuf='', custTimer=null;
+var editOrderId=null, editCart={}, editDelMode='collect', editPayMode='cash', editCustData=null;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n){ return '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -699,8 +777,9 @@ async function openDetail(oid){
       +(parseFloat(o.delivery_cost||0)>0?'<div class="tbr"><span>Delivery</span><span>'+fmt(o.delivery_cost)+'</span></div>':'')
       +'<div class="tbg"><span class="tgl">Grand Total</span><span class="tga">'+fmt(grand)+'</span></div></div>'
       +'<div style="display:flex;gap:8px;margin-top:14px;">'
-      +(o.status==='pending'?'<button class="btn btn-navy" style="flex:1;" onclick="setStatus(\''+oid+'\',\'approved\')"><i class="ti ti-check"></i> Approve</button>':'')
-      +(o.status==='approved'?'<button class="btn btn-green" style="flex:1;" onclick="setStatus(\''+oid+'\',\'invoiced\')"><i class="ti ti-file-invoice"></i> Mark Invoiced</button>':'')
+      +(o.status==='pending'?'<button class="btn btn-primary" style="flex:1;" onclick="openEdit(\''+oid+'\')"><i class="ti ti-edit"></i> Edit Order</button>':'')
+      +(o.status==='approved'?'<button class="btn btn-green" style="flex:1;" onclick="setStatus(\''+oid+'\',\'invoiced\')"><i class="ti ti-truck"></i> Mark Despatched</button>':'')
+      +(o.status==='invoiced'?'<div style="flex:1;text-align:center;font-size:12px;color:var(--green);font-weight:700;"><i class="ti ti-circle-check"></i> Despatched</div>':'')
       +'<button class="btn btn-ghost" style="flex:1;" onclick="navTo(\'s-dash\')"><i class="ti ti-arrow-left"></i> Back</button></div>'
       +'<div style="height:24px;"></div>';
   }catch(e){
@@ -715,6 +794,188 @@ async function setStatus(oid,status){
     toast('Marked as '+status);
     openDetail(oid);
   }catch(e){ toast('Update failed'); }
+}
+
+
+// ── Edit Order ────────────────────────────────────────────────────────────────
+async function openEdit(oid){
+  editOrderId=oid;
+  var body=document.getElementById('s-edit');
+  // Load order + items
+  try{
+    var or=await getSb().from('store_orders').select('*,customers(company_name,contact_person,phone)').eq('id',oid).single();
+    if(or.error) throw or.error;
+    var o=or.data;
+    var ir=await getSb().from('store_items').select('*').eq('order_id',oid);
+    if(ir.error) throw ir.error;
+    var items=ir.data||[];
+
+    // Pre-fill state
+    editCart={};
+    items.forEach(function(it){ editCart[String(it.product_id)]=it.qty; });
+    editDelMode=o.delivery_mode||'collect';
+    editPayMode=o.payment_type||'cash';
+    editCustData=o.customers||{};
+
+    // Pre-fill UI
+    document.getElementById('edit-ref').textContent=o.order_ref;
+    document.getElementById('edit-cust-name').textContent=editCustData.company_name||'—';
+    document.getElementById('edit-cust-sub').textContent=(editCustData.contact_person||'')+(editCustData.phone?' · '+editCustData.phone:'');
+    document.getElementById('edit-del-addr').value=o.delivery_address||'';
+    document.getElementById('edit-del-cost').value=o.delivery_cost||'';
+    document.getElementById('edit-del-partner').value=o.logistics_partner||'';
+    document.getElementById('edit-notes').value=o.notes||'';
+
+    setEditDel(editDelMode);
+    setEditPay(editPayMode);
+    renderEditItems();
+    renderEditTotals();
+
+    // Switch to edit screen
+    document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
+    document.getElementById('s-edit').classList.add('active');
+  }catch(e){
+    console.error(e);
+    toast('Could not load order for editing');
+  }
+}
+function cancelEdit(){
+  editOrderId=null; editCart={}; editCustData=null;
+  navTo('s-dash');
+}
+function setEditDel(m){
+  editDelMode=m;
+  document.getElementById('ed-collect').classList.toggle('on',m==='collect');
+  document.getElementById('ed-deliver').classList.toggle('on',m==='deliver');
+  document.getElementById('edit-del-fields').style.display=m==='deliver'?'block':'none';
+  renderEditTotals();
+}
+function setEditPay(m){
+  editPayMode=m;
+  document.getElementById('ep-cash').className='pay-opt'+(m==='cash'?' on-cash':'');
+  document.getElementById('ep-credit').className='pay-opt'+(m==='credit'?' on-credit':'');
+}
+function renderEditItems(){
+  var el=document.getElementById('edit-items');
+  var entries=Object.entries(editCart);
+  if(!entries.length){
+    el.innerHTML='<div style="padding:12px;font-size:13px;color:var(--muted);text-align:center;">No items — tap Add / change products</div>';
+    return;
+  }
+  el.innerHTML=entries.map(function(e){
+    var id=e[0],qty=e[1];
+    var p=products.find(function(x){return String(x.id)===String(id);});
+    if(!p) return '';
+    var th=p.photo_url?'<div class="oi-th"><img src="'+p.photo_url+'" loading="lazy"/></div>':'<div class="oi-th">'+(p.emoji||'📦')+'</div>';
+    return '<div class="oi">'+th
+      +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+p.name+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);">'+pGst(p)+'% GST</div></div>'
+      +'<div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:var(--saffron);">'+fmt(pTotal(p)*qty)+'</div>'
+      +'<div class="stepper" style="margin-top:6px;">'
+      +'<button onclick="eca(\''+id+'\',-1)">−</button><span>'+qty+'</span><button onclick="eca(\''+id+'\',1)">+</button>'
+      +'</div></div></div>';
+  }).filter(Boolean).join('');
+}
+function eca(id,d){
+  var n=(editCart[id]||0)+d;
+  if(n<=0){delete editCart[id];}else{editCart[id]=n;}
+  renderEditItems();
+  renderEditTotals();
+}
+function renderEditTotals(){
+  var base=0,gst=0;
+  Object.entries(editCart).forEach(function(e){
+    var p=products.find(function(x){return String(x.id)===String(e[0]);});
+    if(!p) return;
+    base+=pBase(p)*e[1]; gst+=pBase(p)*pGst(p)/100*e[1];
+  });
+  var dc=editDelMode==='deliver'?(parseFloat(document.getElementById('edit-del-cost').value)||0):0;
+  document.getElementById('edit-totals').innerHTML=
+    '<div class="tbar"><div class="tbr"><span>Subtotal (excl. GST)</span><span>'+fmt(base)+'</span></div>'
+    +'<div class="tbr"><span>Total GST</span><span>'+fmt(gst)+'</span></div>'
+    +(dc>0?'<div class="tbr"><span>Delivery</span><span>'+fmt(dc)+'</span></div>':'')
+    +'<div class="tbg"><span class="tgl">Grand Total</span><span class="tga">'+fmt(base+gst+dc)+'</span></div></div>';
+}
+// Edit product picker
+function renderEditProds(){
+  var chipEl=document.getElementById('ep-chips');
+  chipEl.innerHTML=cats().map(function(c){
+    return '<span class="chip'+(activeCat===c?' on':'')+'" onclick="activeCat=\''+c+'\';renderEditProds();">'+c+'</span>';
+  }).join('');
+  var q=(document.getElementById('ep-search').value||'').toLowerCase();
+  var f=products.filter(function(p){
+    var mq=!q||(p.name||'').toLowerCase().includes(q)||((p.category||p.cat||'').toLowerCase()).includes(q);
+    var mc=activeCat==='All'||(p.category||p.cat||'')===activeCat;
+    return mq&&mc;
+  });
+  var pl=document.getElementById('ep-list');
+  if(!f.length){pl.innerHTML='<div class="empty"><i class="ti ti-package-off"></i><p>No products found.</p></div>';return;}
+  pl.innerHTML=f.map(function(p){
+    var inC=editCart[String(p.id)]||0;
+    var th=p.photo_url?'<div class="pthumb"><img src="'+p.photo_url+'" loading="lazy"/></div>':'<div class="pthumb">'+(p.emoji||'📦')+'</div>';
+    return '<div class="pcard">'+th+'<div style="flex:1;min-width:0;">'
+      +(p.category||p.cat?'<span class="pcat">'+(p.category||p.cat)+'</span><br/>':'')
+      +'<div style="font-weight:700;font-size:13px;margin-bottom:2px;">'+p.name+'</div>'
+      +'<div style="font-size:14px;font-weight:700;color:var(--saffron);">'+fmt(pTotal(p))+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);">incl. '+pGst(p)+'% GST · base '+fmt(pBase(p))+(p.unit?' / '+p.unit:'')+'</div>'
+      +'<div style="margin-top:8px;">'
+      +(inC>0
+        ?'<div class="stepper"><button onclick="eca(\''+p.id+'\',-1);renderEditProds();">−</button><span>'+inC+'</span><button onclick="eca(\''+p.id+'\',1);renderEditProds();">+</button></div>'
+        :'<button class="btn btn-primary btn-sm" onclick="eca(\''+p.id+'\',1);renderEditProds();"><i class="ti ti-plus"></i> Add</button>'
+      )+'</div></div></div>';
+  }).join('');
+  var tot=Object.values(editCart).reduce(function(a,v){return a+v;},0);
+  document.getElementById('ep-done-lbl').textContent=tot>0?'Done ('+tot+' item'+(tot>1?'s':'')+')':'Done';
+}
+async function saveEdit(){
+  if(!Object.keys(editCart).length){toast('Add at least one product');return;}
+  var btn=document.getElementById('save-edit-btn');
+  btn.disabled=true;
+  btn.innerHTML='<div class="spin" style="border-top-color:#fff;border-color:rgba(255,255,255,.3);"></div> Saving…';
+  try{
+    var base=0,gst=0;
+    var items=[];
+    Object.entries(editCart).forEach(function(e){
+      var p=products.find(function(x){return String(x.id)===String(e[0]);});
+      if(!p) return;
+      var b=pBase(p),g=pGst(p),ga=b*(g/100),qty=e[1];
+      base+=b*qty; gst+=ga*qty;
+      items.push({order_id:editOrderId,product_id:p.id,product_name:p.name,
+        hsn_code:p.hsn_code||p.hsn||null,unit:p.unit||null,
+        qty:qty,base_price:b,gst_pct:g,discount_pct:0,
+        line_base:b*qty,line_gst:ga*qty});
+    });
+    var dc=editDelMode==='deliver'?(parseFloat(document.getElementById('edit-del-cost').value)||0):0;
+    var grand=base+gst+dc;
+
+    // Delete old items and reinsert
+    var dr=await getSb().from('store_items').delete().eq('order_id',editOrderId);
+    if(dr.error) throw dr.error;
+    var ir=await getSb().from('store_items').insert(items);
+    if(ir.error) throw ir.error;
+
+    // Update order
+    var ur=await getSb().from('store_orders').update({
+      delivery_mode:editDelMode,
+      delivery_cost:dc||null,
+      delivery_address:editDelMode==='deliver'?document.getElementById('edit-del-addr').value.trim()||null:null,
+      logistics_partner:editDelMode==='deliver'?document.getElementById('edit-del-partner').value.trim()||null:null,
+      payment_type:editPayMode,
+      notes:document.getElementById('edit-notes').value.trim()||null,
+      sub_base:base, sub_gst:gst, grand_total:grand
+    }).eq('id',editOrderId);
+    if(ur.error) throw ur.error;
+
+    toast('Order updated');
+    var savedId=editOrderId;
+    editOrderId=null; editCart={};
+    openDetail(savedId);
+  }catch(e){
+    console.error(e);
+    toast('Error: '+(e.message||'Could not save'));
+    btn.disabled=false;
+    btn.innerHTML='<i class="ti ti-device-floppy"></i> Save Changes';
+  }
 }
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }
