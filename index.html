@@ -33,7 +33,7 @@
 html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;overscroll-behavior:none;}
 button,input,select,textarea{font-family:var(--font);}
 #app{max-width:430px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
-.screen{display:none;flex-direction:column;height:100%;overflow:hidden;}
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden;}.screen#s-login{overflow-y:auto;}
 .screen.active{display:flex;}
 .topbar{background:var(--navy);color:#fff;padding:calc(10px + var(--safe-top)) 16px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .topbar-logo{display:flex;flex-direction:column;flex:1;min-width:0;}
@@ -110,7 +110,7 @@ select.fc{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 .citem:active{background:var(--surface2);}
 .citem-sub{font-size:11px;color:var(--muted);margin-top:2px;}
 .sel-cust{background:var(--navy-lt);border:1px solid var(--border);border-radius:var(--rad-sm);padding:12px 14px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
-.login-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px;}
+.login-wrap{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;min-height:100%;padding:32px 24px 40px;}
 .login-logo h1{font-size:22px;font-weight:700;color:var(--navy);text-align:center;}
 .login-logo p{font-size:13px;color:var(--muted);text-align:center;margin-top:4px;margin-bottom:28px;}
 .login-card{background:var(--surface);border-radius:var(--rad);border:1px solid var(--border);padding:24px;width:100%;max-width:340px;}
@@ -119,7 +119,7 @@ select.fc{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 .pd.f{background:var(--navy);border-color:var(--navy);}
 .pd.e{background:var(--red);border-color:var(--red);}
 .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:14px;}
-.nk{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rad-sm);padding:13px;font-size:20px;font-weight:600;cursor:pointer;text-align:center;color:var(--ink);}
+.nk{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rad-sm);padding:11px;font-size:20px;font-weight:600;cursor:pointer;text-align:center;color:var(--ink);}
 .nk:active{background:var(--navy-lt);border-color:var(--navy);}
 .login-err{font-size:13px;color:var(--red);text-align:center;margin-top:10px;min-height:18px;}
 .empty{text-align:center;padding:40px 20px;color:var(--muted);}
@@ -296,19 +296,31 @@ select.fc{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 </div>
 <div id="toast"></div>
 
-<!-- ══ FIX 1: Load Supabase UMD — puts window.supabase on the page ══ -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-<!-- ══ FIX 2: ONE plain <script> — NOT type="module" ══
-     Plain scripts are window-scoped, so every function is automatically
-     reachable from onclick="" handlers. No window.X assignment needed.
-     We use variable name "sb" (not "supabase") to avoid redeclaring the
-     global the CDN bundle already placed on window.                    ══ -->
 <script>
-var sb = supabase.createClient(
-  'https://cuxfvbtvmosmgvptygjy.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1eGZ2YnR2bW9zbWd2cHR5Z2p5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MDk5NzYsImV4cCI6MjA5NjA4NTk3Nn0.tuSqeeKONTldWAX1mDwXJAuIjs3o2amcNbfvns-OH4o'
-);
+// ── Supabase lazy init ────────────────────────────────────────────────────────
+// All app functions are defined immediately (so onclick="" always works).
+// sb is created on first use so a CDN delay never crashes the whole script.
+var sb = null;
+var SUPABASE_URL = 'https://cuxfvbtvmosmgvptygjy.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1eGZ2YnR2bW9zbWd2cHR5Z2p5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MDk5NzYsImV4cCI6MjA5NjA4NTk3Nn0.tuSqeeKONTldWAX1mDwXJAuIjs3o2amcNbfvns-OH4o';
+function getSb(){
+  if(!sb){
+    if(typeof supabase === 'undefined'){
+      toast('Connection error – please refresh');
+      throw new Error('Supabase CDN not loaded');
+    }
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+  return sb;
+}
+
+// Load Supabase CDN async — does NOT block function definitions below
+(function(){
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+  s.onerror=function(){ console.error('Supabase CDN failed to load'); };
+  document.head.appendChild(s);
+})();
 
 var STAFF = { baburaj:'1111', selvin:'2222', warehouse:'3333' };
 
@@ -373,7 +385,7 @@ function doLogout(){ me=''; cart={}; selCust=null; pinBuf=''; document.getElemen
 // ── Products ──────────────────────────────────────────────────────────────────
 async function loadProducts(){
   try{
-    var r=await sb.from('products').select('*').eq('is_active',true).order('name');
+    var r=await getSb().from('products').select('*').eq('is_active',true).order('name');
     if(r.error) throw r.error;
     products=r.data||[];
   }catch(e){ console.error(e); toast('Could not load products'); }
@@ -422,7 +434,7 @@ function searchCust(){
   if(!q){document.getElementById('cresults').innerHTML='';return;}
   custTimer=setTimeout(async function(){
     try{
-      var r=await sb.from('customers').select('id,company_name,contact_person,phone')
+      var r=await getSb().from('customers').select('id,company_name,contact_person,phone')
         .or('company_name.ilike.%'+q+'%,phone.ilike.%'+q+'%').limit(8);
       if(r.error) throw r.error;
       var rows=r.data||[];
@@ -521,7 +533,7 @@ async function submitOrder(){
     if(selCust){
       custId=selCust.id;
     } else {
-      var cr=await sb.from('customers').insert({
+      var cr=await getSb().from('customers').insert({
         company_name:document.getElementById('nc-name').value.trim(),
         contact_person:document.getElementById('nc-contact').value.trim()||null,
         phone:document.getElementById('nc-phone').value.trim(),
@@ -542,7 +554,7 @@ async function submitOrder(){
     });
     var dc=delMode==='deliver'?(parseFloat(document.getElementById('del-cost').value)||0):0;
     var ref=mkRef();
-    var or=await sb.from('store_orders').insert({
+    var or=await getSb().from('store_orders').insert({
       order_ref:ref, staff_name:me, customer_id:custId, status:'pending',
       delivery_mode:delMode,
       delivery_cost:dc||null,
@@ -553,7 +565,7 @@ async function submitOrder(){
       sub_base:base, sub_gst:gst, grand_total:base+gst+dc
     }).select('id').single();
     if(or.error) throw or.error;
-    var ir=await sb.from('store_items').insert(items.map(function(i){return Object.assign({},i,{order_id:or.data.id});}));
+    var ir=await getSb().from('store_items').insert(items.map(function(i){return Object.assign({},i,{order_id:or.data.id});}));
     if(ir.error) throw ir.error;
     toast('Order '+ref+' submitted!');
     cart={}; selCust=null;
@@ -590,13 +602,13 @@ async function loadDash(){
   var el=document.getElementById('dash-list');
   el.innerHTML='<div class="loading"><div class="spin"></div> Loading…</div>';
   try{
-    var q=sb.from('store_orders')
+    var q=getSb().from('store_orders')
       .select('id,order_ref,status,created_at,payment_type,grand_total,sub_base,sub_gst,delivery_cost,customers(company_name)')
       .eq('staff_name',me)
       .order('created_at',{ascending:false}).limit(100);
     var r=await q;
     if(r.error && r.error.code==='42703'){
-      q=sb.from('store_orders')
+      q=getSb().from('store_orders')
         .select('id,order_ref,status,created_at,payment_type,customers(company_name)')
         .eq('staff_name',me)
         .order('created_at',{ascending:false}).limit(100);
@@ -650,10 +662,10 @@ async function openDetail(oid){
   var body=document.getElementById('det-body');
   body.innerHTML='<div class="loading"><div class="spin"></div> Loading…</div>';
   try{
-    var or=await sb.from('store_orders').select('*,customers(company_name,contact_person,phone,gstin)').eq('id',oid).single();
+    var or=await getSb().from('store_orders').select('*,customers(company_name,contact_person,phone,gstin)').eq('id',oid).single();
     if(or.error) throw or.error;
     var o=or.data;
-    var ir=await sb.from('store_items').select('*').eq('order_id',oid);
+    var ir=await getSb().from('store_items').select('*').eq('order_id',oid);
     if(ir.error) throw ir.error;
     var items=ir.data||[];
     document.getElementById('det-ref').textContent=o.order_ref;
@@ -698,7 +710,7 @@ async function openDetail(oid){
 }
 async function setStatus(oid,status){
   try{
-    var r=await sb.from('store_orders').update({status:status}).eq('id',oid);
+    var r=await getSb().from('store_orders').update({status:status}).eq('id',oid);
     if(r.error) throw r.error;
     toast('Marked as '+status);
     openDetail(oid);
