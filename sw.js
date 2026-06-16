@@ -1,5 +1,6 @@
 const CACHE = 'raghav-store-v1';
 const ASSETS = ['./index.html', './manifest.json'];
+
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
@@ -11,7 +12,9 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  if (e.request.url.includes('supabase.co')) return; // never cache API calls
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => r))
+    caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
