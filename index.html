@@ -550,7 +550,7 @@ async function submitOrder(){
       base+=b*qty; gst+=ga*qty;
       items.push({product_id:p.id,product_name:p.name,hsn_code:p.hsn_code||p.hsn||null,unit:p.unit||null,
         qty:qty,base_price:b,gst_pct:g,discount_pct:0,
-        line_base:b*qty,line_gst:ga*qty,line_total:(b+ga)*qty});
+        line_base:b*qty,line_gst:ga*qty});
     });
     var dc=delMode==='deliver'?(parseFloat(document.getElementById('del-cost').value)||0):0;
     var ref=mkRef();
