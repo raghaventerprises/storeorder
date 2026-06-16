@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="theme-color" content="#0F2D5E"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="RE Store"/>
@@ -193,10 +194,6 @@ select.fc{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
     </div>
     <button class="btn btn-ghost btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i> Logout</button>
   </div>
-  <div class="tab-bar">
-    <button class="tab-btn active" id="tab-my"  onclick="dashTab('my')">My Orders</button>
-    <button class="tab-btn"        id="tab-all" onclick="dashTab('all')">All Orders</button>
-  </div>
   <div class="content" id="dash-list">
     <div class="loading"><div class="spin"></div> Loading orders…</div>
   </div>
@@ -323,13 +320,7 @@ var pinBuf='', custTimer=null;
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n){ return '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function mkRef(){ return 'SO-'+Date.now().toString().slice(-7); }
-function timeAgo(ts){
-  var s=Math.floor((Date.now()-new Date(ts))/1000);
-  if(s<60) return 'just now';
-  if(s<3600) return Math.floor(s/60)+'m ago';
-  if(s<86400) return Math.floor(s/3600)+'h ago';
-  return new Date(ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-}
+
 function toast(msg){
   var t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
@@ -576,36 +567,77 @@ async function submitOrder(){
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-function dashTab(m){
-  dashMode=m;
-  document.getElementById('tab-my').classList.toggle('active',m==='my');
-  document.getElementById('tab-all').classList.toggle('active',m==='all');
-  loadDash();
+function fmtDateLabel(ts){
+  // Returns "Today", "Yesterday", or "12 Jun 2026"
+  if(!ts) return '';
+  var d=new Date(ts), now=new Date();
+  var dStr=d.toDateString(), nStr=now.toDateString();
+  if(dStr===nStr) return 'Today';
+  var yest=new Date(now); yest.setDate(now.getDate()-1);
+  if(dStr===yest.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+}
+function fmtTime(ts){
+  if(!ts) return '';
+  return new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+function fmtDateFull(ts){
+  if(!ts) return '';
+  var d=new Date(ts);
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+' · '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
 }
 async function loadDash(){
   var el=document.getElementById('dash-list');
   el.innerHTML='<div class="loading"><div class="spin"></div> Loading…</div>';
   try{
     var q=sb.from('store_orders')
-      .select('id,order_ref,status,created_at,payment_type,delivery_mode,grand_total,sub_base,sub_gst,delivery_cost,customers(company_name,phone)')
-      .order('created_at',{ascending:false}).limit(60);
-    if(dashMode==='my') q=q.eq('staff_name',me);
+      .select('id,order_ref,status,created_at,payment_type,grand_total,sub_base,sub_gst,delivery_cost,customers(company_name)')
+      .eq('staff_name',me)
+      .order('created_at',{ascending:false}).limit(100);
     var r=await q;
+    if(r.error && r.error.code==='42703'){
+      q=sb.from('store_orders')
+        .select('id,order_ref,status,created_at,payment_type,customers(company_name)')
+        .eq('staff_name',me)
+        .order('created_at',{ascending:false}).limit(100);
+      r=await q;
+    }
     if(r.error) throw r.error;
     var rows=r.data||[];
-    if(!rows.length){el.innerHTML='<div class="empty"><i class="ti ti-clipboard-off"></i><p>No orders yet.<br/>Tap + to start one.</p></div>';return;}
-    el.innerHTML=rows.map(function(o){
-      var cn=(o.customers&&o.customers.company_name)||'Unknown';
-      var ph=(o.customers&&o.customers.phone)||'';
-      var grand=o.grand_total||(parseFloat(o.sub_base||0)+parseFloat(o.sub_gst||0)+parseFloat(o.delivery_cost||0));
-      return '<div class="ocard" onclick="openDetail(\''+o.id+'\')"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;"><span style="font-size:12px;font-weight:700;color:var(--navy);">'+o.order_ref+'</span><span style="font-size:11px;color:var(--muted);">'+timeAgo(o.created_at)+'</span></div>'
-        +'<div style="font-size:15px;font-weight:700;margin-bottom:3px;">'+cn+'</div>'
-        +'<div style="font-size:12px;color:var(--muted);">'+(ph?ph+' · ':'')+o.delivery_mode+'</div>'
-        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">'
-        +'<div style="display:flex;gap:6px;"><span class="badge b-'+o.status+'">'+o.status+'</span><span class="badge b-'+(o.payment_type||'cash')+'">'+((o.payment_type||'cash').toUpperCase())+'</span></div>'
-        +'<span style="font-size:16px;font-weight:700;color:var(--saffron);">'+fmt(grand)+'</span>'
-        +'</div></div>';
-    }).join('');
+    if(!rows.length){
+      el.innerHTML='<div class="empty"><i class="ti ti-clipboard-off"></i><p>No orders yet.<br/>Tap + to start one.</p></div>';
+      return;
+    }
+    // Group by date
+    var groups={}, groupOrder=[];
+    rows.forEach(function(o){
+      var label=fmtDateLabel(o.created_at);
+      if(!groups[label]){ groups[label]=[]; groupOrder.push(label); }
+      groups[label].push(o);
+    });
+    var html='';
+    groupOrder.forEach(function(label){
+      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:14px 0 8px;padding:0 2px;">'+label+'</div>';
+      groups[label].forEach(function(o){
+        var cn=(o.customers&&o.customers.company_name)||'Unknown';
+        var grand=o.grand_total||(parseFloat(o.sub_base||0)+parseFloat(o.sub_gst||0)+parseFloat(o.delivery_cost||0));
+        var pay=o.payment_type||'cash';
+        html+='<div class="ocard" onclick="openDetail(''+o.id+'')">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+          +'<span style="font-size:12px;font-weight:700;color:var(--navy);">'+o.order_ref+'</span>'
+          +'<span style="font-size:11px;color:var(--muted);">'+fmtTime(o.created_at)+'</span>'
+          +'</div>'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+          +'<span style="font-size:15px;font-weight:700;">'+cn+'</span>'
+          +'<span style="font-size:15px;font-weight:700;color:var(--saffron);">'+fmt(grand)+'</span>'
+          +'</div>'
+          +'<div style="margin-top:8px;">'
+          +'<span class="badge b-'+pay+'">'+pay.toUpperCase()+'</span>'
+          +'</div>'
+          +'</div>';
+      });
+    });
+    el.innerHTML=html;
   }catch(e){
     console.error(e);
     el.innerHTML='<div class="empty"><i class="ti ti-alert-circle"></i><p>Could not load orders.</p></div>';
@@ -627,7 +659,7 @@ async function openDetail(oid){
     document.getElementById('det-ref').textContent=o.order_ref;
     var c=o.customers||{};
     var grand=o.grand_total||(parseFloat(o.sub_base||0)+parseFloat(o.sub_gst||0)+parseFloat(o.delivery_cost||0));
-    var dt=new Date(o.created_at).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    var dt=fmtDateFull(o.created_at);
     body.innerHTML=
       '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px;">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span class="badge b-'+o.status+'">'+o.status+'</span><span style="font-size:11px;color:var(--muted);">'+dt+'</span></div>'
