@@ -634,7 +634,7 @@ async function loadDash(){
         var cn=(o.customers&&o.customers.company_name)||'Unknown';
         var grand=o.grand_total||(parseFloat(o.sub_base||0)+parseFloat(o.sub_gst||0)+parseFloat(o.delivery_cost||0));
         var pay=o.payment_type||'cash';
-        html+='<div class="ocard" onclick="openDetail(''+o.id+'')">'
+        html+='<div class="ocard" onclick="openDetail(\''+o.id+'\')">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
           +'<span style="font-size:12px;font-weight:700;color:var(--navy);">'+o.order_ref+'</span>'
           +'<span style="font-size:11px;color:var(--muted);">'+fmtTime(o.created_at)+'</span>'
