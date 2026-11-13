@@ -1,7 +1,7 @@
 {
-  "name": "SHRAVAN – Raghav Enterprises",
-  "short_name": "SHRAVAN",
-  "description": "Store counter order management for Raghav Enterprises",
+  "name": "SR.One",
+  "short_name": "SR.One",
+  "description": "Store counter order management",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0F2D5E",
