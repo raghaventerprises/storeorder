@@ -597,8 +597,9 @@ function renderRevTotals(){
   document.getElementById('rev-totals').innerHTML=
     '<div class="tbar"><div class="tbr"><span>Subtotal (excl. GST)</span><span>'+fmt(base)+'</span></div>'
     +'<div class="tbr"><span>Total GST</span><span>'+fmt(gst)+'</span></div>'
-    +(dc>0?'<div class="tbr"><span>Delivery</span><span>'+fmt(dc)+'</span></div>':'')
-    +'<div class="tbg"><span class="tgl">Grand Total</span><span class="tga">'+fmt(base+gst+dc)+'</span></div></div>';
+    +'<div class="tbg"><span class="tgl">Grand Total</span><span class="tga">'+fmt(base+gst)+'</span></div>'
+    +(dc>0?'<div class="tbr" style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.25);"><span>Delivery (not billed)</span><span>'+fmt(dc)+'</span></div>':'')
+    +'</div>';
 }
 
 // ── Submit ────────────────────────────────────────────────────────────────────
@@ -640,7 +641,7 @@ async function submitOrder(){
       logistics_partner:delMode==='deliver'?document.getElementById('del-partner').value.trim()||null:null,
       payment_type:payMode,
       notes:document.getElementById('order-notes').value.trim()||null,
-      sub_base:base, sub_gst:gst, grand_total:base+gst+dc
+      sub_base:base, sub_gst:gst, grand_total:base+gst
     }).select('id').single();
     if(or.error) throw or.error;
     var ir=await getSb().from('store_items').insert(items.map(function(i){return Object.assign({},i,{order_id:or.data.id});}));
@@ -710,7 +711,7 @@ async function loadDash(){
       html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:14px 0 8px;padding:0 2px;">'+label+'</div>';
       groups[label].forEach(function(o){
         var cn=(o.customers&&o.customers.company_name)||'Unknown';
-        var grand=o.grand_total||(parseFloat(o.sub_base||0)+parseFloat(o.sub_gst||0)+parseFloat(o.delivery_cost||0));
+        var grand=o.grand_total||(parseFloat(o.sub_base||0)+parseFloat(o.sub_gst||0));
         var pay=o.payment_type||'cash';
         html+='<div class="ocard" onclick="openDetail(\''+o.id+'\')">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
@@ -748,7 +749,7 @@ async function openDetail(oid){
     var items=ir.data||[];
     document.getElementById('det-ref').textContent=o.order_ref;
     var c=o.customers||{};
-    var grand=o.grand_total||(parseFloat(o.sub_base||0)+parseFloat(o.sub_gst||0)+parseFloat(o.delivery_cost||0));
+    var grand=o.grand_total||(parseFloat(o.sub_base||0)+parseFloat(o.sub_gst||0));
     var dt=fmtDateFull(o.created_at);
     body.innerHTML=
       '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rad);padding:14px;margin-bottom:10px;">'
@@ -774,8 +775,9 @@ async function openDetail(oid){
       }).join('')
       +'<div class="tbar"><div class="tbr"><span>Subtotal (excl. GST)</span><span>'+fmt(o.sub_base||0)+'</span></div>'
       +'<div class="tbr"><span>Total GST</span><span>'+fmt(o.sub_gst||0)+'</span></div>'
-      +(parseFloat(o.delivery_cost||0)>0?'<div class="tbr"><span>Delivery</span><span>'+fmt(o.delivery_cost)+'</span></div>':'')
-      +'<div class="tbg"><span class="tgl">Grand Total</span><span class="tga">'+fmt(grand)+'</span></div></div>'
+      +'<div class="tbg"><span class="tgl">Grand Total</span><span class="tga">'+fmt(grand)+'</span></div>'
+      +(parseFloat(o.delivery_cost||0)>0?'<div class="tbr" style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.25);"><span>Delivery (not billed)</span><span>'+fmt(o.delivery_cost)+'</span></div>':'')
+      +'</div>'
       +'<div style="display:flex;gap:8px;margin-top:14px;">'
       +(o.status==='pending'?'<button class="btn btn-primary" style="flex:1;" onclick="openEdit(\''+oid+'\')"><i class="ti ti-edit"></i> Edit Order</button>':'')
       +(o.status==='approved'?'<button class="btn btn-green" style="flex:1;" onclick="setStatus(\''+oid+'\',\'invoiced\')"><i class="ti ti-truck"></i> Mark Despatched</button>':'')
@@ -893,8 +895,9 @@ function renderEditTotals(){
   document.getElementById('edit-totals').innerHTML=
     '<div class="tbar"><div class="tbr"><span>Subtotal (excl. GST)</span><span>'+fmt(base)+'</span></div>'
     +'<div class="tbr"><span>Total GST</span><span>'+fmt(gst)+'</span></div>'
-    +(dc>0?'<div class="tbr"><span>Delivery</span><span>'+fmt(dc)+'</span></div>':'')
-    +'<div class="tbg"><span class="tgl">Grand Total</span><span class="tga">'+fmt(base+gst+dc)+'</span></div></div>';
+    +'<div class="tbg"><span class="tgl">Grand Total</span><span class="tga">'+fmt(base+gst)+'</span></div>'
+    +(dc>0?'<div class="tbr" style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.25);"><span>Delivery (not billed)</span><span>'+fmt(dc)+'</span></div>':'')
+    +'</div>';
 }
 // Edit product picker
 function renderEditProds(){
@@ -946,7 +949,7 @@ async function saveEdit(){
         line_base:b*qty,line_gst:ga*qty});
     });
     var dc=editDelMode==='deliver'?(parseFloat(document.getElementById('edit-del-cost').value)||0):0;
-    var grand=base+gst+dc;
+    var grand=base+gst;
 
     // Delete old items and reinsert
     var dr=await getSb().from('store_items').delete().eq('order_id',editOrderId);
