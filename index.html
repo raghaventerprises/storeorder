@@ -80,6 +80,8 @@ select.fc{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 .stepper{display:inline-flex;align-items:center;background:var(--surface2);border-radius:20px;border:1px solid var(--border);overflow:hidden;}
 .stepper button{background:none;border:none;width:34px;height:32px;cursor:pointer;font-size:18px;font-weight:700;color:var(--navy);display:flex;align-items:center;justify-content:center;}
 .stepper span{font-size:13px;font-weight:700;min-width:26px;text-align:center;}
+.stepper input{width:46px;border:none;background:transparent;text-align:center;font-family:inherit;font-size:16px;font-weight:700;color:var(--ink);padding:0;outline:none;}
+.stepper input:focus{background:var(--surface);}
 .oi{display:flex;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rad-sm);padding:10px;margin-bottom:8px;align-items:center;}
 .oi-th{width:40px;height:40px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;}
 .oi-th img{width:100%;height:100%;object-fit:cover;}
@@ -492,12 +494,38 @@ function renderProds(){
       +'<div style="font-size:11px;color:var(--muted);">incl. '+pGst(p)+'% GST · base '+fmt(pBase(p))+(p.unit?' / '+p.unit:'')+'</div>'
       +'<div style="margin-top:8px;">'
       +(inC>0
-        ?'<div class="stepper"><button onclick="ca(\''+p.id+'\',-1)">−</button><span>'+inC+'</span><button onclick="ca(\''+p.id+'\',1)">+</button></div>'
+        ?qtyBox(p.id,inC,'ca','cs')
         :'<button class="btn btn-primary btn-sm" onclick="ca(\''+p.id+'\',1)"><i class="ti ti-plus"></i> Add</button>'
       )+'</div></div></div>';
   }).join('');
   var tot=Object.values(cart).reduce(function(a,v){return a+v;},0);
   document.getElementById('step3lbl').textContent=tot>0?'Review Order ('+tot+' item'+(tot>1?'s':'')+')':'Review Order';
+}
+// Quantity box: tap to type (number keypad on phones), − and + still step by one
+function qtyBox(id,qty,stepFn,setFn,after){
+  after=after||'';
+  return '<div class="stepper">'
+    +'<button aria-label="Less" onclick="'+stepFn+'(\''+id+'\',-1);'+after+'">−</button>'
+    +'<input type="text" inputmode="numeric" pattern="[0-9]*" aria-label="Quantity" value="'+qty+'"'
+    +' onfocus="this.select()" onkeydown="if(event.key===\'Enter\')this.blur()"'
+    +' onchange="'+setFn+'(\''+id+'\',this.value);'+after+'"/>'
+    +'<button aria-label="More" onclick="'+stepFn+'(\''+id+'\',1);'+after+'">+</button></div>';
+}
+function cleanQty(v){ return Math.max(0,Math.floor(Number(String(v).replace(/[^0-9]/g,''))||0)); }
+// An emptied box puts the old number back; only a typed 0 removes the item
+function noDigits(v){ return String(v).replace(/[^0-9]/g,'')===''; }
+function cs(id,v){
+  if(noDigits(v)){ renderProds(); return; }
+  var n=cleanQty(v);
+  if(n<=0){delete cart[id];}else{cart[id]=n;}
+  renderProds();
+}
+function ecs(id,v){
+  if(noDigits(v)){ renderEditItems(); return; }
+  var n=cleanQty(v);
+  if(n<=0){delete editCart[id];}else{editCart[id]=n;}
+  renderEditItems();
+  renderEditTotals();
 }
 function ca(id,d){
   var n=(cart[id]||0)+d;
@@ -582,7 +610,7 @@ function renderRevItems(){
       +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+p.name+'</div>'
       +'<div style="font-size:11px;color:var(--muted);">Qty '+qty+' · '+pGst(p)+'% GST</div></div>'
       +'<div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:var(--saffron);">'+fmt(pTotal(p)*qty)+'</div>'
-      +'<div class="stepper" style="margin-top:6px;"><button onclick="ca(\''+id+'\',-1);renderRev();">−</button><span>'+qty+'</span><button onclick="ca(\''+id+'\',1);renderRev();">+</button></div>'
+      +'<div style="margin-top:6px;">'+qtyBox(id,qty,'ca','cs','renderRev();')+'</div>'
       +'</div></div>';
   }).filter(Boolean).join('');
 }
@@ -873,9 +901,8 @@ function renderEditItems(){
       +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+p.name+'</div>'
       +'<div style="font-size:11px;color:var(--muted);">'+pGst(p)+'% GST</div></div>'
       +'<div style="text-align:right;"><div style="font-size:13px;font-weight:700;color:var(--saffron);">'+fmt(pTotal(p)*qty)+'</div>'
-      +'<div class="stepper" style="margin-top:6px;">'
-      +'<button onclick="eca(\''+id+'\',-1)">−</button><span>'+qty+'</span><button onclick="eca(\''+id+'\',1)">+</button>'
-      +'</div></div></div>';
+      +'<div style="margin-top:6px;">'+qtyBox(id,qty,'eca','ecs')+'</div>'
+      +'</div></div>';
   }).filter(Boolean).join('');
 }
 function eca(id,d){
@@ -923,7 +950,7 @@ function renderEditProds(){
       +'<div style="font-size:11px;color:var(--muted);">incl. '+pGst(p)+'% GST · base '+fmt(pBase(p))+(p.unit?' / '+p.unit:'')+'</div>'
       +'<div style="margin-top:8px;">'
       +(inC>0
-        ?'<div class="stepper"><button onclick="eca(\''+p.id+'\',-1);renderEditProds();">−</button><span>'+inC+'</span><button onclick="eca(\''+p.id+'\',1);renderEditProds();">+</button></div>'
+        ?qtyBox(p.id,inC,'eca','ecs','renderEditProds();')
         :'<button class="btn btn-primary btn-sm" onclick="eca(\''+p.id+'\',1);renderEditProds();"><i class="ti ti-plus"></i> Add</button>'
       )+'</div></div></div>';
   }).join('');
